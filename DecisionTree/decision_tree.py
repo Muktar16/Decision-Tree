@@ -9,10 +9,10 @@ class Leaf:
 
 
 class Decision_Node:
-    def __init__(self,condition,right_dataset,left_dataset):
+    def __init__(self,condition,right_node,left_node):
         self.condition = condition
-        self.right_dataset = right_dataset
-        self.left_dataset = left_dataset
+        self.right_node = right_node
+        self.left_node = left_node
 
 
 def read_data_from_file(filename):
@@ -55,10 +55,10 @@ def split(dataset, condition):
 
 def Entropy(dataset):
     counts = class_counts(dataset)
-    entropy = 0
+    entropy = 0.0
     for class_id in counts:
         prob_of_class = counts[class_id] / float(len(dataset))
-        entropy = entropy - math.log(prob_of_class,2)
+        entropy = entropy - prob_of_class*math.log(prob_of_class,2)
     return entropy
 
 
@@ -71,9 +71,9 @@ def find_best_split(dataset):
     best_gain = 0 
     best_condition = None 
     current_entropy = Entropy(dataset)
-    n_item_in_col = len(dataset[0]) - 1  
+    n_item_col = len(dataset[0]) - 1  
 
-    for col in range(n_item_in_col): 
+    for col in range(n_item_col): 
 
         values = set([row[col] for row in dataset]) 
 
@@ -100,10 +100,10 @@ def create_decision_tree(dataset):
 
     right_dataset, left_dataset = split(dataset, condition)
     
-    right_branch = create_decision_tree(right_dataset)
-    left_branch = create_decision_tree(left_dataset)
+    right_node = create_decision_tree(right_dataset)
+    left_node = create_decision_tree(left_dataset)
     
-    return Decision_Node(condition, right_branch, left_branch)
+    return Decision_Node(condition, right_node, left_node)
 
 
 def print_tree(node, prefix=""):
@@ -113,10 +113,11 @@ def print_tree(node, prefix=""):
     print ("Decision_Node " + str(node.condition.column) + "   " + str(node.condition.value))
 
     print (prefix + ' L--> ', end = "")
-    print_tree(node.right_dataset, prefix + "   ")
+    print_tree(node.right_node, prefix + "   ")
 
-    print (prefix + ' R--> ', end = "")
-    print_tree(node.left_dataset, prefix + "   ")
+    print (prefix + ' R--> ',
+           end = "")
+    print_tree(node.left_node, prefix + "   ")
 
 
 def classify(row, node):  
@@ -124,17 +125,17 @@ def classify(row, node):
         return node.predictions
 
     if node.condition.match(row):
-        return classify(row, node.right_dataset)
+        return classify(row, node.right_node)
     else:
-        return classify(row, node.left_dataset)
+        return classify(row, node.left_node)
 
 
-def create_folds(dataset):
+def create_folds(dataset,n_folds):
     folds = list()
-    groupsize = int(len(dataset)/10)
-    for i in range (10):
+    fold_size = int(len(dataset)/n_folds)
+    for i in range (n_folds):
         fold = list()
-        for j in range (groupsize):
+        for j in range (fold_size):
             idx = randint(0, len(dataset)-1)
             fold.append(dataset.pop(idx))
         folds.append(fold)
@@ -144,21 +145,22 @@ def create_folds(dataset):
 def calculate_accuracy(folds):
     total_accuracy = 0.0
     for fold in folds:
-        trainData = list(folds) 
-        trainData.remove(fold)
-        trainData = sum(trainData, [])
-        testData = fold
-        my_tree = create_decision_tree(trainData)
-        print_tree(my_tree, "")
+        trainingData = list(folds) 
+        trainingData.remove(fold)
+        trainingData = sum(trainingData, [])
+        testingData = fold
+        my_tree = create_decision_tree(trainingData)
+        print_tree(my_tree)
+        
         total_row = 0
-        total_matched = 0
-        for row in testData:
+        matche_count = 0
+        for row in testingData:
             total_row += 1
             classified = classify(row,my_tree)
-            for lbl in classified.keys():
-                if lbl == row[-1]:
-                    total_matched += 1
-        accuracy = total_matched/total_row*100
+            for class_id in classified.keys():
+                if class_id == row[-1]:
+                    matche_count += 1
+        accuracy = (matche_count/total_row)*100
         total_accuracy += accuracy
         print()
         print('Accuracy: ', accuracy, '%')
@@ -167,15 +169,15 @@ def calculate_accuracy(folds):
 
 
 if __name__ == '__main__':
-    #get_data_from_file
     dataset = read_data_from_file('wine.csv')
     for row in dataset:
         row = convertToFloat(row)
-        
-    folds = create_folds(dataset)
+    
+    n_folds = 10   
+    folds = create_folds(dataset,n_folds)
     
     total_accuracy = calculate_accuracy(folds)
     
-    average_accuracy = total_accuracy/ 10
+    average_accuracy = total_accuracy/ n_folds
     print('Mean Accuracy: ', average_accuracy,"%")
     print()
